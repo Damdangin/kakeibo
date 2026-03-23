@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 
 //APIから返ってくるデータの型
 interface Transaction {
@@ -152,13 +153,17 @@ export default function KakeiboPage() {
         {/* 【右側】：数値表示 ＋ バー表示 */}
         <div className="p-10 md:w-7/12 bg-white flex flex-col  space-y-8">
           {/* 追加：ログイン・新規登録ボタンエリア */}
-          <div className="flex justify-end space-x-4 mb-4">
-            <button className="text-sm font-bold text-zinc-500 hover:text-indigo-600 transition-colors">
-              ログイン
-            </button>
-            <button className="bg-zinc-100 text-zinc-800 px-4 py-2 rounded-xl text-sm font-bold hover:bg-zinc-200 transition-all shadow-sm">
-              新規登録
-            </button>
+          <div className="flex justify-end space-x-6 mb-4">
+            <Link href="/login">
+              <button className="text-sm font-bold text-zinc-500 hover:text-indigo-600 transition-colors py-2">
+                ログイン
+              </button>
+            </Link>
+            <Link href="/signup">
+              <button className="bg-zinc-100 text-zinc-800 px-4 py-2 rounded-xl text-sm font-bold hover:bg-zinc-200 transition-all shadow-sm">
+                新規ID登録
+              </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 gap-6">

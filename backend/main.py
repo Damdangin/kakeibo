@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 import models, schemas, database
+# from auth_utils import get_password_hash
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -22,7 +23,6 @@ app.add_middleware(
 )
 
 # --- APIエンドポイント ---
-
 def get_db():
     db = database.SessionLocal()
     try:
@@ -43,3 +43,17 @@ def create_transaction(item: schemas.TransactionCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(db_item) # IDなどが付与された最新状態を反映
     return db_item
+
+# ユーザー登録用
+@app.post("/signup")
+def signup(username: str, password: str, db: Session = Depends(get_db)):
+    # すでに同じ名前のユーザーがいないかチェック
+    existing_user = db.query(models.User).filter(models.User.username == username).first()
+    if existing_user:
+        return {"error": "このユーザー名は既に使われています"}
+    
+    hashed_pwd = get_password_hash(password)
+    new_user = models.User(username=username, hashed_password=hashed_pwd)
+    db.add(new_user)
+    db.commit()
+    return {"message": "ユーザー登録が完了しました！"}
