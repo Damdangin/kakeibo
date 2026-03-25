@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import date
 from typing import Optional
 
@@ -15,6 +15,14 @@ class TransactionCreate(TransactionBase):
 # データを読み出す時に使う（IDが含まれる）
 class Transaction(TransactionBase):
     id: int
-
     class Config:
         from_attributes = True # SQLAlchemyのモデルをPydanticに変換可能にする設定
+
+# --- Auth Schemas ---
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+class UserSignup(BaseModel):
+    email: EmailStr
+    password: str
+    verification_code: str
