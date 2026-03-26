@@ -11,10 +11,11 @@ from auth_utils import get_password_hash, verify_password
 # from auth_utils import get_password_hash
 models.Base.metadata.create_all(bind=database.engine)
 
+#SMTP設定
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587  # Gmail은 587(TLS)을 사용합니다.
-SENDER_EMAIL = "ttodggs@gmail.com"  # 본인의 Gmail 주소
-SENDER_PASSWORD = "dsuf vgul zfnx imfz" # 방금 발급받은 16자리 앱 비밀번호
+SMTP_PORT = 587  # Gmailは 587(TLS)
+SENDER_EMAIL = "ttodggs@gmail.com"
+SENDER_PASSWORD = "dsuf vgul zfnx imfz"
 
 app = FastAPI()
 
@@ -54,13 +55,11 @@ def create_transaction(item: schemas.TransactionCreate, db: Session = Depends(ge
     return db_item
 
 # 1. 認証番号送信 (Send Email)
-@app.post("/auth/send-email")
+@app.post("/send-email")
 async def send_email(request: schemas.EmailRequest, db: Session = Depends(get_db)):
-    # 중복 체크 로직 생략 (기존 코드 유지)
 
     code = str(random.randint(100000, 999999))
     
-    # 메일 객체 생성
     msg = EmailMessage()
     msg["Subject"] = "[Kakeibo] 認証番号のご案内"
     msg["From"] = SENDER_EMAIL
@@ -68,43 +67,95 @@ async def send_email(request: schemas.EmailRequest, db: Session = Depends(get_db
     msg.set_content(f"認証番号は 【{code}】 です。")
 
     try:
-        # Gmail은 TLS 보안 연결을 사용합니다.
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()  # TLS 시작 (보안 연결)
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
-        # DB 저장 로직 (기존 코드 그대로 유지)
-        temp_user = db.query(models.User).filter(models.User.email == request.email).first()
-        if temp_user:
-            temp_user.verification_code = code
+        db_verification = db.query(models.EmailVerification).filter(
+            models.EmailVerification.email == request.email
+        ).first()
+
+        if db_verification:
+            # 이미 있으면 번호만 업데이트
+            db_verification.verification_code = code
+            # 필요하다면 생성 시간도 업데이트
+            # db_verification.created_at = func.now() 
         else:
-            temp_user = models.User(email=request.email, verification_code=code, hashed_password="temp")
-            db.add(temp_user)
+            # 없으면 새로 생성
+            db_verification = models.EmailVerification(
+                email=request.email, 
+                verification_code=code
+            )
+            db.add(db_verification)
         
         db.commit()
         return {"message": "認証番号を送信しました。"}
+    
     except Exception as e:
+        db.rollback()
         print(f"Mail Error: {e}") 
         raise HTTPException(status_code=500, detail=f"メール送信に失敗しました: {str(e)}")
     
+@app.post("/verify-code")
+async def verify_code(request: schemas.VerificationCheck, db: Session = Depends(get_db)):
+    # DB에서 해당 이메일의 최신 인증 정보 조회
+    db_verification = db.query(models.EmailVerification).filter(
+        models.EmailVerification.email == request.email
+    ).order_by(models.EmailVerification.created_at.desc()).first()
+
+    # 인증 정보가 아예 없는 경우
+    if not db_verification:
+        raise HTTPException(status_code=404, detail="認証要求の記録が見つかりません。")
+
+    # 번호 대조
+    if db_verification.verification_code != request.verification_code:
+        # 틀리면 인증 상태를 False로 확실히 고정 (보안)
+        db_verification.is_verified = False
+        db.commit()
+        raise HTTPException(status_code=400, detail="認証番号が一致しません。")
+
+    # 번호가 맞으면 승인 상태(True)로 변경
+    db_verification.is_verified = True
+    db.commit()
+    
+    return {"message": "認証に成功しました。"}
 
 # 2. 新規会員登録 (Signup)
 @app.post("/signup")
 def signup(user_data: schemas.UserSignup, db: Session = Depends(get_db)):
-    # ユーザーと認証番号の確認
-    user = db.query(models.User).filter(
-        models.User.email == user_data.email, 
-        models.User.verification_code == user_data.verification_code
+    # 1. [수정] User 테이블이 아닌 EmailVerification 테이블에서 인증 상태 확인
+    verification = db.query(models.EmailVerification).filter(
+        models.EmailVerification.email == user_data.email,
+        models.EmailVerification.verification_code == user_data.verification_code,
+        models.EmailVerification.is_verified == True  # 반드시 True여야 함
     ).first()
 
-    if not user:
-        raise HTTPException(status_code=400, detail="認証番号が一致しないか、無効です。")
+    # 인증 기록이 없거나, 번호가 틀렸거나, '인증하기' 버튼을 안 눌렀을 경우
+    if not verification:
+        raise HTTPException(
+            status_code=400, 
+            detail="認証が完了していないか, 認証番号が一致しません。"
+        )
 
-    # 正式に登録処理
-    user.hashed_password = get_password_hash(user_data.password)
-    user.is_active = True
-    user.verification_code = None # 使用済みコードを削除
-    db.commit()
+    # 2. [수정] 실제 User 테이블에 새로운 레코드 생성 (INSERT)
+    # 기존에 이미 가입된 이메일인지 체크 (중복 방지)
+    existing_user = db.query(models.User).filter(models.User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="既に登録されているメールアドレスです。")
     
+    hashed_pw = get_password_hash(user_data.password)
+
+    new_user = models.User(
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password), # 비밀번호 암호화
+        is_active=True
+    )
+    
+    db.add(new_user)
+    
+    # 3. [추가] 가입이 완료되었으므로 임시 인증 데이터는 삭제 (깔끔하게 정리)
+    db.delete(verification)
+    
+    db.commit()
     return {"message": "ユーザー登録が完了しました！"}
