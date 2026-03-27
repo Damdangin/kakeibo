@@ -16,7 +16,7 @@ class EmailVerification(Base):
     email = Column(String, index=True, nullable=False)
     verification_code = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    is_verified = Column(Boolean, default=False) # 인증 성공 여부
+    is_verified = Column(Boolean, default=False) # 認証済みフラグ
 
 class User(Base):
     __tablename__ = "users"
@@ -24,5 +24,5 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False) 
     hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True) # 가입 완료 시 True
+    is_active = Column(Boolean, default=True) # 有効フラグ (会員登録完了時にTrue)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

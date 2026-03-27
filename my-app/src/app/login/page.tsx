@@ -9,9 +9,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    // TODO: バックエンド /login API 呼び出し
-    console.log("ログイン試行:", username);
-    router.push("/"); // 成功したらメインへ
+    try {
+      const response = await fetch("http://localhost:8000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: username, // 入力欄のusernameをemailとして送信
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("ログインに成功しました！");
+        router.push("/"); // 成功したらメインへ
+      } else {
+        alert(data.detail || "ログインに失敗しました。");
+      }
+    } catch (error) {
+      console.error("通信エラー:", error);
+      alert("サーバーに接続できませんでした。");
+    }
   };
 
   return (

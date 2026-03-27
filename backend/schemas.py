@@ -22,13 +22,18 @@ class Transaction(TransactionBase):
 class EmailRequest(BaseModel):
     email: EmailStr
 
-# 2. 사용자가 번호를 입력하고 '인증하기' 버튼을 눌러 확인할 때 (선택 사항)
+#ユーザーが認証コードを入力し、「認証する」ボタンを押下して確認する場合 (任意項目)
 class VerificationCheck(BaseModel):
     email: EmailStr
     verification_code: str
 
-# 3. 모든 인증이 끝나고 '회원가입 완료'를 누를 때 (실제 DB User 테이블 생성용)
+#全ての認証完了後、「会員登録完了」を押下する場合 (DB Userテーブル作成用)
 class UserSignup(BaseModel):
     email: EmailStr
     password: str
-    verification_code: str  # 백엔드에서 마지막으로 번호를 한 번 더 대조합니다.
+    verification_code: str  # バックエンドで再度コードの照合を行います。
+
+#ユーザーログイン
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str

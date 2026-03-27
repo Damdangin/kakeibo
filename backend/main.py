@@ -68,7 +68,7 @@ async def send_email(request: schemas.EmailRequest, db: Session = Depends(get_db
 
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()  # TLS 시작 (보안 연결)
+            server.starttls()  # TLS開始 (セキュア接続)
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
@@ -77,12 +77,12 @@ async def send_email(request: schemas.EmailRequest, db: Session = Depends(get_db
         ).first()
 
         if db_verification:
-            # 이미 있으면 번호만 업데이트
+            # 既存レコードがある場合は認証コードのみ更新
             db_verification.verification_code = code
-            # 필요하다면 생성 시간도 업데이트
+            # 必要に応じて生成時間も更新
             # db_verification.created_at = func.now() 
         else:
-            # 없으면 새로 생성
+            # レコードがない場合は新規作成
             db_verification = models.EmailVerification(
                 email=request.email, 
                 verification_code=code
@@ -99,23 +99,23 @@ async def send_email(request: schemas.EmailRequest, db: Session = Depends(get_db
     
 @app.post("/verify-code")
 async def verify_code(request: schemas.VerificationCheck, db: Session = Depends(get_db)):
-    # DB에서 해당 이메일의 최신 인증 정보 조회
+    # DBから該当メールアドレスの最新認証情報を取得
     db_verification = db.query(models.EmailVerification).filter(
         models.EmailVerification.email == request.email
     ).order_by(models.EmailVerification.created_at.desc()).first()
 
-    # 인증 정보가 아예 없는 경우
+    # 認証情報が存在しない場合
     if not db_verification:
         raise HTTPException(status_code=404, detail="認証要求の記録が見つかりません。")
 
-    # 번호 대조
+    # 認証コードの照合
     if db_verification.verification_code != request.verification_code:
-        # 틀리면 인증 상태를 False로 확실히 고정 (보안)
+        # 不一致の場合、認証ステータスをFalseで固定 (セキュリティ対策)
         db_verification.is_verified = False
         db.commit()
         raise HTTPException(status_code=400, detail="認証番号が一致しません。")
 
-    # 번호가 맞으면 승인 상태(True)로 변경
+    # 照合成功時、認証済みステータス(True)に変更
     db_verification.is_verified = True
     db.commit()
     
@@ -124,38 +124,52 @@ async def verify_code(request: schemas.VerificationCheck, db: Session = Depends(
 # 2. 新規会員登録 (Signup)
 @app.post("/signup")
 def signup(user_data: schemas.UserSignup, db: Session = Depends(get_db)):
-    # 1. [수정] User 테이블이 아닌 EmailVerification 테이블에서 인증 상태 확인
+    # 1. EmailVerificationテーブルで認証ステータスを確認
     verification = db.query(models.EmailVerification).filter(
         models.EmailVerification.email == user_data.email,
         models.EmailVerification.verification_code == user_data.verification_code,
-        models.EmailVerification.is_verified == True  # 반드시 True여야 함
+        models.EmailVerification.is_verified == True  # 認証済み必須
     ).first()
 
-    # 인증 기록이 없거나, 번호가 틀렸거나, '인증하기' 버튼을 안 눌렀을 경우
+    # 認証記録がない、コード不一致、または認証ボタン未押下の場合
     if not verification:
         raise HTTPException(
             status_code=400, 
-            detail="認証が完了していないか, 認証番号が一致しません。"
+            detail="認証が完了していないか、認証番号が一致しません。"
         )
 
-    # 2. [수정] 실제 User 테이블에 새로운 레코드 생성 (INSERT)
-    # 기존에 이미 가입된 이메일인지 체크 (중복 방지)
+    # 2. Userテーブルに新規レコード作成 (INSERT)
+    # 重複登録チェック
     existing_user = db.query(models.User).filter(models.User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="既に登録されているメールアドレスです。")
     
-    hashed_pw = get_password_hash(user_data.password)
-
     new_user = models.User(
         email=user_data.email,
-        hashed_password=get_password_hash(user_data.password), # 비밀번호 암호화
+        hashed_password=get_password_hash(user_data.password), # パスワード暗号化
         is_active=True
     )
     
     db.add(new_user)
     
-    # 3. [추가] 가입이 완료되었으므로 임시 인증 데이터는 삭제 (깔끔하게 정리)
+    # 3. 登録完了後、不要な一時認証データを削除
     db.delete(verification)
     
     db.commit()
     return {"message": "ユーザー登録が完了しました！"}
+
+#login/page.tsx
+@app.post("/login")
+def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
+    #DBからユーザーを取得
+    user = db.query(models.User).filter(models.User.email == user_data.email).first()
+    
+    # 2. ユーザーが存在しない、またはパスワードが不一致の場合
+    if not user or not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401, 
+            detail="メールアドレスまたはパスワードが正しくありません。"
+        )
+
+    # 3. 本来はここでJWTトークンを生成して返しますが、まずは成功メッセージを返します
+    return {"message": "ログイン成功", "email": user.email}

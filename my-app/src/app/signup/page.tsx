@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function SignupPage() {
   const router = useRouter();
 
-  // --- 스테이트 관리 ---
+  // --- ステート管理 ---
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -14,7 +14,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
-  const [isVerified, setIsVerified] = useState(false); // 인증 성공 여부 추가
+  const [isVerified, setIsVerified] = useState(false); // 認証成功フラグ
 
   const validateEmail = (emailStr: string) => {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,7 +31,7 @@ export default function SignupPage() {
     }
   };
 
-  // 1. 인증번호 발송 처리
+  // 1. 認証番号送信処理
   const handleSendEmail = async () => {
     if (!email || !validateEmail(email)) {
       alert("有効なメールアドレスを入力してください。");
@@ -47,20 +47,20 @@ export default function SignupPage() {
 
       if (response.ok) {
         setIsEmailSent(true);
-        alert("認証번호를 전송했습니다. 메일을 확인해주세요.");
+        alert("認証番号を送信しました。メールを確認してください。");
       } else {
         const errorData = await response.json();
-        alert(errorData.detail || "전송에 실패했습니다.");
+        alert(errorData.detail || "送信に失敗しました。");
       }
     } catch (error) {
-      alert("네트워크 에러가 발생했습니다.");
+      alert("ネットワークエラーが発生しました。");
     }
   };
 
-  // 2. 인증번호 검증 처리 (추가된 로직)
+  // 2. 認証番号照合処理
   const handleVerifyCode = async () => {
     if (!verificationCode) {
-      alert("인증번호를 입력해주세요.");
+      alert("認証番号を入力してください。");
       return;
     }
 
@@ -76,24 +76,24 @@ export default function SignupPage() {
 
       if (response.ok) {
         setIsVerified(true);
-        alert("인증에 성공했습니다.");
+        alert("認証に成功しました。");
       } else {
         const errorData = await response.json();
-        alert(errorData.detail || "인증번호가 일치하지 않습니다.");
+        alert(errorData.detail || "認証番号が一致しません。");
       }
     } catch (error) {
-      alert("인증 처리 중 오류가 발생했습니다.");
+      alert("認証処理中にエラーが発生しました。");
     }
   };
 
-  // 3. 최종 회원가입 실행
+  // 3. 最終的な会員登録実行
   const handleSignup = async () => {
     if (!isVerified) {
-      alert("먼저 이메일 인증을 완료해주세요.");
+      alert("先にメール認証を完了してください。");
       return;
     }
     if (password !== confirmPassword) {
-      alert("비밀번호가 일치하지 않습니다.");
+      alert("パスワードが一致しません。");
       return;
     }
 
@@ -104,19 +104,19 @@ export default function SignupPage() {
         body: JSON.stringify({
           email: email,
           password: password,
-          verification_code: verificationCode, // 백엔드 최종 검증용
+          verification_code: verificationCode, // バックエンド最終照合用
         }),
       });
 
       if (response.ok) {
-        alert("등록에 성공했습니다! 로그인해주세요.");
+        alert("登録に成功しました！ログインしてください。");
         router.push("/login");
       } else {
         const errorData = await response.json();
-        alert(errorData.detail || "가입에 실패했습니다.");
+        alert(errorData.detail || "登録に失敗しました。");
       }
     } catch (error) {
-      alert("가입 처리 중 오류가 발생했습니다.");
+      alert("登録処理中にエラーが発生しました。");
     }
   };
 
@@ -128,7 +128,7 @@ export default function SignupPage() {
         </h1>
 
         <div className="space-y-6">
-          {/* Email 입력 영역 */}
+          {/* Email入力エリア */}
           <div className="flex flex-col space-y-1">
             <div className="flex gap-2 items-end">
               <div className="flex-1">
@@ -140,7 +140,7 @@ export default function SignupPage() {
                   placeholder="example@email.com"
                   value={email}
                   onChange={handleEmailChange}
-                  disabled={isVerified} // 인증 완료 시 수정 불가
+                  disabled={isVerified} // 認証完了後は修正不可
                   className={`w-full border-b-2 p-3 outline-none transition-colors text-black ${
                     emailError
                       ? "border-red-500"
@@ -159,7 +159,7 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* 인증번호 입력 & 확인 버튼 영역 */}
+          {/* 認証番号入力 & 確認ボタンエリア */}
           <div className="flex flex-col space-y-1">
             <label className="text-xs font-bold text-indigo-600 ml-1">
               認証番号
@@ -171,7 +171,7 @@ export default function SignupPage() {
                   placeholder="6桁の番号を入力"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
-                  disabled={isVerified} // 인증 완료 시 수정 불가
+                  disabled={isVerified} // 認証完了後は修正不可
                   className={`w-full border-b-2 p-3 outline-none transition-colors ${
                     isVerified
                       ? "border-green-500 bg-green-50 text-green-700"
@@ -199,7 +199,7 @@ export default function SignupPage() {
             )}
           </div>
 
-          {/* 패스워드 입력 영역 (인증 완료 후에만 활성화 권장) */}
+          {/* パスワード入力エリア (認証完了後のみ有効) */}
           <div
             className={`space-y-6 transition-opacity ${isVerified ? "opacity-100" : "opacity-30 pointer-events-none"}`}
           >
